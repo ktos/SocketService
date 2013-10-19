@@ -1,0 +1,6 @@
+/TcpSocketService/Bin
+/TcpSocketService/obj
+/TcpSocketServiceWP8/Bin
+/TcpSocketServiceWP8/obj
+*.user
+*.suo

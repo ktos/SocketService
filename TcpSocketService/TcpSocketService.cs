@@ -97,10 +97,22 @@ namespace Ktos.SocketService
         }
 
         /// <summary>
-        /// Server initialization - starting listening on a specified port
+        /// Server initialization - starting listening on a specific port. IP address to bind to will be found automatically 
+        /// without including APIPA addresses, but using IPv6 if possible.
+        /// </summary>
+        /// <param name="servicePort"></param>
+        public async void InitializeServer(string servicePort)
+        {            
+            this.InitializeServer(servicePort, false, true);
+        }
+
+        /// <summary>
+        /// Server initialization - starting listening on a specified port. IP address to bind to will be found automatically.
         /// </summary>
         /// <param name="servicePort">Port number to bind to</param>
-        public async void InitializeServer(string servicePort)
+        /// <param name="useAutoAddress">Allows using APIPA addresses (169.254.0.0/16)</param>
+        /// <param name="useIpv6">Allows using IPv6-family addresses</param>
+        public async void InitializeServer(string servicePort, bool useAutoAddress, bool useIpv6)
         {
             if (operationMode != SocketServiceMode.SERVER)
                 throw new SocketServiceException("Mode not set properly.");            
@@ -112,7 +124,13 @@ namespace Ktos.SocketService
                 foreach (var item in Windows.Networking.Connectivity.NetworkInformation.GetHostNames())
                 {
                     if (item.IPInformation != null)
-                    {                        
+                    {
+                        if ((item.Type == Windows.Networking.HostNameType.Ipv6) && !useIpv6)
+                            continue;
+
+                        if (item.DisplayName.StartsWith("169.254") && !useAutoAddress)
+                            continue;
+
                         listen = item.DisplayName;
                         break;
                     }

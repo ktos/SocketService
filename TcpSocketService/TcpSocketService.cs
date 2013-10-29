@@ -116,27 +116,12 @@ namespace Ktos.SocketService
         {
             if (operationMode != SocketServiceMode.SERVER)
                 throw new SocketServiceException("Mode not set properly.");            
-
-            string listen = "";
+             
             try
-            {                
-                // finding an IP address to bind to
-                foreach (var item in Windows.Networking.Connectivity.NetworkInformation.GetHostNames())
-                {
-                    if (item.IPInformation != null)
-                    {
-                        if ((item.Type == Windows.Networking.HostNameType.Ipv6) && !useIpv6)
-                            continue;
+            {
+                string listen = findAddress(useAutoAddress, useIpv6);
 
-                        if (item.DisplayName.StartsWith("169.254") && !useAutoAddress)
-                            continue;
-
-                        listen = item.DisplayName;
-                        break;
-                    }
-                }
-
-                if (listen != "")
+                if (listen != null)
                 {
                     // start listening
                     socketListener = new StreamSocketListener();
@@ -157,6 +142,35 @@ namespace Ktos.SocketService
             {
                 throw new SocketServiceException("Cannot start server.", e);
             }
+        }
+
+        /// <summary>
+        /// Automatic finding to what adddress bind to
+        /// </summary>
+        /// <param name="useAutoAddress">Allows using APIPA addresses (169.254.0.0/16)</param>
+        /// <param name="useIpv6">Allows using IPv6-family addresses</param>
+        /// <returns>IP address possible to bind to, or null</returns>
+        private static string findAddress(bool useAutoAddress, bool useIpv6)
+        {
+            string listen = null;
+
+            // finding an IP address to bind to
+            foreach (var item in Windows.Networking.Connectivity.NetworkInformation.GetHostNames())
+            {
+                if (item.IPInformation != null)
+                {
+                    if ((item.Type == Windows.Networking.HostNameType.Ipv6) && !useIpv6)
+                        continue;
+
+                    if (item.DisplayName.StartsWith("169.254") && !useAutoAddress)
+                        continue;
+
+                    listen = item.DisplayName;
+                    break;
+                }
+            }
+             
+            return listen;
         }
 
         /// <summary>

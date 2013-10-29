@@ -36,6 +36,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Windows.Networking.Sockets;
 using Windows.Storage.Streams;
+using Windows.System.Threading;
 
 namespace Ktos.SocketService
 {
@@ -44,8 +45,70 @@ namespace Ktos.SocketService
     /// </summary>
     public enum SocketServiceMode
     {
+        /// <summary>
+        /// Designates mode as server
+        /// </summary>
         SERVER = 0,
+
+        /// <summary>
+        /// Designates client mode
+        /// </summary>
         CLIENT = 1
+    }
+
+    /// <summary>
+    /// A helper class which represents client
+    /// </summary>
+    public class ServiceClient : IDisposable
+    {
+        /// <summary>
+        /// Client GUID by which is identified by the server
+        /// </summary>
+        public string Id { get; private set; }
+
+        /// <summary>
+        /// A reference to client socket
+        /// </summary>
+        public StreamSocket Socket { get; private set; }
+
+        /// <summary>
+        /// Client's own DataWriter
+        /// </summary>
+        public DataWriter Writer { get; set; }
+
+        /// <summary>
+        /// Creates a new TcpCleint
+        /// </summary>
+        /// <param name="id">An id, should be GUID</param>
+        /// <param name="socket">A client socket got by accepted connection</param>
+        public ServiceClient(string id, StreamSocket socket)
+        {
+            this.Id = id;
+            this.Socket = socket;
+        }
+
+        /// <summary>
+        /// Generates random GUID
+        /// </summary>
+        /// <returns>A generated GUID</returns>
+        public static string GetRandomId()
+        {
+            return Guid.NewGuid().ToString();
+        }
+
+        /// <summary>
+        /// Disposes the object and it's all subelements
+        /// </summary>
+        public void Dispose()
+        {
+            this.Socket.Dispose();
+            this.Socket = null;
+
+            this.Writer.Dispose();
+            this.Writer = null;
+
+            this.Id = null;
+        }
     }
 
     /// <summary>
@@ -68,19 +131,19 @@ namespace Ktos.SocketService
     public class TcpSocketService
     {
         /// <summary>
+        /// Fake client GUID
+        /// </summary>
+        private const string CLIENTGUID = "00000000-0000-0000-0000-000000000000";
+
+        /// <summary>
         /// Server socket
         /// </summary>
         protected StreamSocketListener socketListener;
 
         /// <summary>
-        /// Client socket
+        /// List of connected clients
         /// </summary>
-        protected Windows.Networking.Sockets.StreamSocket client;
-
-        /// <summary>
-        /// Writer used when sending messages
-        /// </summary>
-        protected DataWriter writer;
+        protected List<ServiceClient> clients;
 
         /// <summary>
         /// Selected operating mode (client or server)
@@ -93,7 +156,8 @@ namespace Ktos.SocketService
         /// <param name="mode">Operation mode - client or server</param>
         public TcpSocketService(SocketServiceMode mode)
         {
-            this.operationMode = mode;            
+            this.operationMode = mode;
+            clients = new List<ServiceClient>();
         }
 
         /// <summary>
@@ -102,8 +166,8 @@ namespace Ktos.SocketService
         /// </summary>
         /// <param name="servicePort">Port number to bind to</param>
         public void InitializeServer(string servicePort)
-        {            
-            this.InitializeServer(servicePort, false, true);            
+        {
+            this.InitializeServer(servicePort, false, true);
         }
 
 
@@ -127,14 +191,15 @@ namespace Ktos.SocketService
         public async void InitializeServer(string servicePort, string serviceAddress)
         {
             if (operationMode != SocketServiceMode.SERVER)
-                throw new SocketServiceException("Mode not set properly.");            
-             
+                throw new SocketServiceException("Mode not set properly.");
+
             try
             {
                 string listen = serviceAddress;
 
                 if (listen != null)
                 {
+
                     // start listening
                     socketListener = new StreamSocketListener();
                     socketListener.ConnectionReceived += OnConnectionReceived;
@@ -181,7 +246,7 @@ namespace Ktos.SocketService
                     break;
                 }
             }
-             
+
             return listen;
         }
 
@@ -189,6 +254,12 @@ namespace Ktos.SocketService
         /// An event performed when server started listening
         /// </summary>
         public event ListeningEventHandler Listening;
+
+        /// <summary>
+        /// Event handler when server starts listening
+        /// </summary>
+        /// <param name="sender">Sender class reference</param>
+        /// <param name="e">Event arguments - address bound to</param>
         public delegate void ListeningEventHandler(object sender, ListeningEventArgs e);
 
         /// <summary>
@@ -201,39 +272,39 @@ namespace Ktos.SocketService
         {
             try
             {
-                // remove listener, we're done
-                // TODO: change to multi-client
-                socketListener.Dispose();
-                socketListener = null;
+                // add client
+                var cid = ServiceClient.GetRandomId();
+                var c = new ServiceClient(cid, args.Socket);
+                clients.Add(c);
 
-                client = args.Socket;
-                
                 // send some information about client
                 if (ClientConnected != null)
-                    ClientConnected.Invoke(this, new ClientConnectedEventArgs(client.Information));
+                    ClientConnected.Invoke(this, new ClientConnectedEventArgs(c.Socket.Information, c.Id));
 
-                CommunicationLoop();
+                // start the communication loop
+                CommunicationLoop(cid);
             }
             catch (Exception e)
             {
-                //Disconnected.Invoke(this, new DisconnectedEventArgs(e));                
                 throw new SocketServiceException("Inner exception caused communication break.", e);
             }
         }
 
-        
-
         /// <summary>
-        /// Reading the message
+        /// Get client from list of client, with specified GUID
         /// </summary>
-        /// <param name="reader"></param>
-        /// <param name="currentLength"></param>
-        protected void readMessage(DataReader reader, uint currentLength)
+        /// <param name="id">GUID to look for</param>
+        /// <returns>Whole reference to the client</returns>
+        public ServiceClient GetClient(string id)
         {
-            byte[] message = new byte[currentLength];
-            reader.ReadBytes(message);
-            if (MessageReceived != null)
-                MessageReceived.Invoke(this, new MessageReceivedEventArgs(message));
+            try
+            {
+                return clients.First(c => c.Id == id);
+            }
+            catch (InvalidOperationException)
+            {
+                return null;
+            }
         }
 
         /// <summary>
@@ -253,16 +324,18 @@ namespace Ktos.SocketService
                 throw new SocketServiceException("Mode not set properly.");
 
             // try to connect
-            client = new StreamSocket();
+            var clientSocket = new StreamSocket();
+            var cid = TcpSocketService.CLIENTGUID;
+            clients.Add(new ServiceClient(cid, clientSocket));
             try
             {
                 // if succeeded, notify about it
-                await client.ConnectAsync(new Windows.Networking.HostName(host), port);
+                await clientSocket.ConnectAsync(new Windows.Networking.HostName(host), port);
                 if (Connected != null)
                     Connected.Invoke(this);
 
                 // and start communication loop
-                CommunicationLoop();
+                CommunicationLoop(cid);
             }
             catch (Exception e)
             {
@@ -271,82 +344,102 @@ namespace Ktos.SocketService
         }
 
         /// <summary>
-        /// Notifies about connecting to the client
+        /// Notifies about connecting to the sever
         /// </summary>
         public event ConnectedEventHandler Connected;
-        public delegate void ConnectedEventHandler(object sender);        
+        public delegate void ConnectedEventHandler(object sender);
 
         /// <summary>
         /// Communication loop with the server (or client - it was the same thing)
         /// </summary>
-        protected async void CommunicationLoop()
+        protected async void CommunicationLoop(string clientId)
         {
             try
             {
-                var reader = new DataReader(client.InputStream);
-                writer = new DataWriter(client.OutputStream);
+                // get a client to start communication loop
+                var c = GetClient(clientId);
 
-                // same 
+                if (c == null)
+                    throw new IndexOutOfRangeException("Client not found");
+
+                var reader = new DataReader(c.Socket.InputStream);
+
+                // input stream is ready as soon as possible
+                reader.InputStreamOptions = InputStreamOptions.Partial;
+                c.Writer = new DataWriter(c.Socket.OutputStream);
+
+                // while client is not disconnected
                 bool remoteDisconnection = false;
                 while (!remoteDisconnection)
                 {
-                    uint readLength = await reader.LoadAsync(sizeof(uint));
-                    if (readLength < sizeof(uint))
-                    {
-                        remoteDisconnection = true;
-                        break;
-                    }
-                    uint currentLength = reader.ReadUInt32();
+                    // try to get about 4 KB of data (may be less)
+                    var data = await reader.LoadAsync(4096);
 
-                    readLength = await reader.LoadAsync(currentLength);
-                    if (readLength < currentLength)
+                    // if there is no data - disconnected
+                    if (data == 0)
                     {
                         remoteDisconnection = true;
                         break;
                     }
 
-                    readMessage(reader, currentLength);                    
+                    // put them to buffer, and send event
+                    var b = new byte[data];
+                    reader.ReadBytes(b);
+
+                    if (DataReceived != null)
+                        DataReceived.Invoke(this, new DataReceivedEventArgs(b));
                 }
 
+                // when disconnected - detach, send event and remove client
                 reader.DetachStream();
-                if (remoteDisconnection)
-                {
-                    if (Disconnected != null)
-                        Disconnected.Invoke(this, new DisconnectedEventArgs(null));
-                }
+
+                if (Disconnected != null)
+                    Disconnected.Invoke(this, new DisconnectedEventArgs(clientId));
+
+                // removing client
+                clients.Remove(c);
+                c.Dispose();
+                c = null;
+            }
+            catch (SocketServiceException)
+            {
+                throw;
             }
             catch (Exception e)
             {
-                throw new SocketServiceException("Inner exception caused communication break.", e);
+                if (e.HResult != -2147023901) // exception with -2147023901 is thrown when disconnect is done from our side, so we're ignoring it here
+                    throw new SocketServiceException("Inner exception caused communication break.", e);
             }
         }
 
         /// <summary>
         /// Executed when new message arrives
         /// </summary>
-        public event MessageReceivedEventHandler MessageReceived;
-        public delegate void MessageReceivedEventHandler(object sender, MessageReceivedEventArgs e);
+        public event DataReceivedEventHandler DataReceived;
+        public delegate void DataReceivedEventHandler(object sender, DataReceivedEventArgs e);
 
         /// <summary>
         /// Executed when client (or server) disconnects
         /// </summary>
         public event DisconnectedEventHandler Disconnected;
-        public delegate void DisconnectedEventHandler(object sender, DisconnectedEventArgs e);        
+        public delegate void DisconnectedEventHandler(object sender, DisconnectedEventArgs e);
 
         /// <summary>
-        /// Sends the message to the other side
+        /// Sends the message to the client of specified Id
         /// </summary>
         /// <param name="message">Message, will be automatically added length</param>
-        public async void Send(byte[] message)
+        /// <param name="clientId">Client Id to send data to</param>
+        public async void Send(byte[] message, string clientId)
         {
             try
             {
-                if (client != null)
-                {                    
-                    writer.WriteUInt32((uint)message.Length);
-                    writer.WriteBytes(message);
+                var c = GetClient(clientId);
+                if (c != null)
+                {
+                    //writer.WriteUInt32((uint)message.Length);
+                    c.Writer.WriteBytes(message);
 
-                    await writer.StoreAsync();                    
+                    await c.Writer.StoreAsync();
                 }
                 else
                 {
@@ -360,46 +453,68 @@ namespace Ktos.SocketService
         }
 
         /// <summary>
+        /// Sends message to every client
+        /// </summary>
+        /// <param name="message"></param>
+        public void Send(byte[] message)
+        {
+            for (int i = 0; i < clients.Count; i++)
+            {
+                this.Send(message, clients[i].Id);
+            }
+        }
+
+        /// <summary>
         /// Disconnects from server (or client)
         /// </summary>
-        public void Disconnect()
+        public void Disconnect(string clientId)
         {
-
             if (socketListener != null)
             {
                 socketListener.Dispose();
                 socketListener = null;
             }
 
-            if (writer != null)
+            var c = this.GetClient(clientId);
+            if (c != null)
             {
-                writer.DetachStream();
-                writer = null;
-            }
+                // removing client
+                clients.Remove(c);
+                c.Dispose();
+                c = null;
 
-            if (client != null)
-            {
-                client.Dispose();
-                client = null;
+                if (Disconnected != null)
+                    Disconnected.Invoke(this, new DisconnectedEventArgs(clientId));
             }
+        }
 
+        /// <summary>
+        /// Disconnects from server
+        /// </summary>
+        public void Disconnect()
+        {
+            if (operationMode != SocketServiceMode.CLIENT)
+                throw new SocketServiceException("Invalid operation mode");
+
+            this.Disconnect(TcpSocketService.CLIENTGUID);
         }
     }
 
     /// <summary>
-    /// Event arguments when message received
+    /// Event arguments when data from client (or server) are received
     /// </summary>
-    public class MessageReceivedEventArgs : EventArgs
+    public class DataReceivedEventArgs : EventArgs
     {
         /// <summary>
         /// Received message (without length)
         /// </summary>
-        public byte[] Message { get { return this.message; } }
-        private byte[] message;
+        public byte[] Data { get { return this.data; } }
+        private byte[] data;
 
-        public MessageReceivedEventArgs(byte[] message) : base()
+        public DataReceivedEventArgs(byte[] data)
+            : base()
         {
-            this.message = message;
+            this.data = data;
         }
     }
 
@@ -420,7 +535,7 @@ namespace Ktos.SocketService
             this.host = host;
         }
     }
-    
+
     /// <summary>
     /// Event args when client connects
     /// </summary>
@@ -432,33 +547,56 @@ namespace Ktos.SocketService
         public StreamSocketInformation ClientInformation { get { return this.clientInformation; } }
         private StreamSocketInformation clientInformation;
 
-        public ClientConnectedEventArgs(StreamSocketInformation clientInformation)
+        /// <summary>
+        /// GUID of connected client
+        /// </summary>
+        public string ClientId { get; private set; }
+
+        public ClientConnectedEventArgs(StreamSocketInformation clientInformation, string clientId)
             : base()
         {
             this.clientInformation = clientInformation;
+            this.ClientId = clientId;
         }
     }
 
     /// <summary>
-    /// Event args when disconnects is
+    /// Event args when client is disconnected
     /// </summary>
     public class DisconnectedEventArgs : EventArgs
     {
         /// <summary>
         /// Exception, if disconnection is because of exception
         /// </summary>
-        public Exception Error { get { return this.error; } }
-        private Exception error;
+        public Exception Error { get; private set; }
+
+        /// <summary>
+        /// Client ID, which was disconnected
+        /// </summary>
+        public string Id { get; private set; }
 
         public DisconnectedEventArgs(Exception ex)
             : base()
         {
-            this.error = ex;
+            this.Error = ex;
+        }
+
+        public DisconnectedEventArgs(string id)
+            : base()
+        {
+            this.Id = id;
+        }
+
+        public DisconnectedEventArgs(Exception ex, string id)
+            : base()
+        {
+            this.Error = ex;
+            this.Id = id;
         }
     }
 
     /// <summary>
-    /// Generic class for various exceptions from TcpSocketService
+    /// Generic class for various exceptions from SocketService
     /// </summary>
     public class SocketServiceException : Exception
     {

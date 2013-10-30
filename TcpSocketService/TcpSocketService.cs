@@ -52,76 +52,12 @@ namespace Ktos.SocketService
     }
 
     /// <summary>
-    /// A helper class which represents client
-    /// </summary>
-    public class ServiceClient : IDisposable
-    {
-        /// <summary>
-        /// Client GUID by which is identified by the server
-        /// </summary>
-        public string Id { get; private set; }
-
-        /// <summary>
-        /// A reference to client socket
-        /// </summary>
-        public StreamSocket Socket { get; private set; }
-
-        /// <summary>
-        /// Client's own DataWriter
-        /// </summary>
-        public DataWriter Writer { get; set; }
-
-        /// <summary>
-        /// Creates a new TcpCleint
-        /// </summary>
-        /// <param name="id">An id, should be GUID</param>
-        /// <param name="socket">A client socket got by accepted connection</param>
-        public ServiceClient(string id, StreamSocket socket)
-        {
-            this.Id = id;
-            this.Socket = socket;
-        }
-
-        /// <summary>
-        /// Generates random GUID
-        /// </summary>
-        /// <returns>A generated GUID</returns>
-        public static string GetRandomId()
-        {
-            return Guid.NewGuid().ToString();
-        }
-
-        /// <summary>
-        /// Disposes the object and it's all subelements
-        /// </summary>
-        public void Dispose()
-        {
-            this.Socket.Dispose();
-            this.Socket = null;
-
-            this.Writer.Dispose();
-            this.Writer = null;
-
-            this.Id = null;
-        }
-    }
-
-    /// <summary>
     /// TcpSocketService is a base class for Windows 8 sockets-based applications. 
     /// Based on Windows.Networking.Sockets and Windows.Storage.Streams is common
     /// for Windows 8 and Windows Phone 8 and provides a TCP client and server
-    /// implementation for exchanging messages.
+    /// implementation for exchanging messages.        
     /// 
-    /// Every message is a byte array preceded by 4 bytes (uint32) of message's
-    /// length.
-    /// 
-    /// Based on Sockets, it could be easily modified to use e.g. Bluetooth 
-    /// instead of TCP.
-    /// 
-    /// Server is single-client oriented at the moment.
-    /// 
-    /// Supports creating derived classes for specific implementation, like
-    /// text chat.
+    /// Supports creating derived classes for specific protocol implementations.
     /// </summary>
     public class TcpSocketService
     {      
@@ -301,6 +237,12 @@ namespace Ktos.SocketService
         /// Notification about client connected, sends information about the client
         /// </summary>
         public virtual event ClientConnectedEventHandler ClientConnected;
+
+        /// <summary>
+        /// A Delegate for event when client connects to the server
+        /// </summary>
+        /// <param name="sender">Instance of the server class</param>
+        /// <param name="e">Client ID and client socket information</param>
         public delegate void ClientConnectedEventHandler(object sender, ClientConnectedEventArgs e);
 
         /// <summary>
@@ -337,6 +279,11 @@ namespace Ktos.SocketService
         /// Notifies about connecting to the sever
         /// </summary>
         public virtual event ConnectedEventHandler Connected;
+
+        /// <summary>
+        /// A delegate handling event when client connects tot he server
+        /// </summary>
+        /// <param name="sender">Instance of client class</param>
         public delegate void ConnectedEventHandler(object sender);
 
         /// <summary>
@@ -423,12 +370,24 @@ namespace Ktos.SocketService
         /// Executed when new message arrives
         /// </summary>
         public virtual event DataReceivedEventHandler DataReceived;
+
+        /// <summary>
+        /// A delegate handling receiving data from server or client
+        /// </summary>
+        /// <param name="sender">Instance of client/server class</param>
+        /// <param name="e">Data received</param>
         public delegate void DataReceivedEventHandler(object sender, DataReceivedEventArgs e);
 
         /// <summary>
         /// Executed when client (or server) disconnects
         /// </summary>
         public virtual event DisconnectedEventHandler Disconnected;
+
+        /// <summary>
+        /// A delegate handling disconnection event
+        /// </summary>
+        /// <param name="sender">Instance of client/server class</param>
+        /// <param name="e">Client ID of a disconnected client and exception (if any)</param>
         public delegate void DisconnectedEventHandler(object sender, DisconnectedEventArgs e);
 
         /// <summary>
@@ -442,8 +401,7 @@ namespace Ktos.SocketService
             {
                 var c = GetClient(clientId);
                 if (c != null)
-                {
-                    //writer.WriteUInt32((uint)message.Length);
+                {                    
                     c.Writer.WriteBytes(message);
 
                     await c.Writer.StoreAsync();
@@ -518,6 +476,10 @@ namespace Ktos.SocketService
         public byte[] Data { get { return this.data; } }
         private byte[] data;
 
+        /// <summary>
+        /// Creates a new DataReceivedEventArgs object
+        /// </summary>
+        /// <param name="data">A data received from connection</param>
         public DataReceivedEventArgs(byte[] data)
             : base()
         {
@@ -536,6 +498,10 @@ namespace Ktos.SocketService
         public string Host { get { return this.host; } }
         private string host;
 
+        /// <summary>
+        /// Creates a new ListeningEventArgs object
+        /// </summary>
+        /// <param name="host">A host we're bind to</param>
         public ListeningEventArgs(string host)
             : base()
         {
@@ -559,6 +525,11 @@ namespace Ktos.SocketService
         /// </summary>
         public string ClientId { get; private set; }
 
+        /// <summary>
+        /// Creates a new ClientConnectedEventArgs object
+        /// </summary>
+        /// <param name="clientInformation">Client socket information</param>
+        /// <param name="clientId">Client's GUID</param>
         public ClientConnectedEventArgs(StreamSocketInformation clientInformation, string clientId)
             : base()
         {
@@ -582,18 +553,31 @@ namespace Ktos.SocketService
         /// </summary>
         public string Id { get; private set; }
 
+        /// <summary>
+        /// Creates a new DisconnectedEventArgs object
+        /// </summary>
+        /// <param name="ex">Exception, if disconnection is because of exception</param>
         public DisconnectedEventArgs(Exception ex)
             : base()
         {
             this.Error = ex;
         }
 
+        /// <summary>
+        /// Creates a new DisconnectedEventArgs object
+        /// </summary>
+        /// <param name="id">Client GUID, when client disconnects</param>
         public DisconnectedEventArgs(string id)
             : base()
         {
             this.Id = id;
         }
 
+        /// <summary>
+        /// Creates a new DisconnectedEventArgs object
+        /// </summary>
+        /// <param name="ex">Exception, if disconnection is because of exception</param>
+        /// <param name="id">Client GUID of a disconnected client</param>
         public DisconnectedEventArgs(Exception ex, string id)
             : base()
         {
@@ -607,12 +591,21 @@ namespace Ktos.SocketService
     /// </summary>
     public class SocketServiceException : Exception
     {
+        /// <summary>
+        /// Creates a new SocketServiceException object
+        /// </summary>
+        /// <param name="message">Informational message about exception</param>
         public SocketServiceException(string message)
             : base(message)
         {
 
         }
 
+        /// <summary>
+        /// Creates a new SocketServiceException object
+        /// </summary>
+        /// <param name="message">Informational message about exception</param>
+        /// <param name="innerException">Exception which caused throwing SocketServiceException</param>
         public SocketServiceException(string message, Exception innerException)
             : base(message, innerException)
         {

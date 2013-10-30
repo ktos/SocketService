@@ -1,4 +1,4 @@
 SocketService
 ================
 
-SocketService is a simple client-server socket library for Windows 8 and Windows Phone 8, allowing customization and building specific service libraries, allowing for building not only TCP connection, but for example also Bluetooth ones, upon it.
+SocketService is a simple client and server socket library for Windows 8 and Windows Phone 8 based on Windows.Networking.Sockets allowing to build services on top of it. Currently, the TcpSocketService is only avaliable, providing implementation of TCP client and multi-client TCP server.

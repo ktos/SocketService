@@ -93,8 +93,7 @@ namespace Ktos.SocketService
         /// BindServiceNameAsync we're using is automatically starting listening on every address
         /// avaliable. To find an suitable address to present client use <see cref="FindAddress"/>
         /// </summary>
-        /// <param name="servicePort">Port number to bind to</param>
-        /// <param name="serviceAddress">Address to bind to</param>
+        /// <param name="servicePort">Port number to bind to</param>        
         public async Task InitializeServerAsync(string servicePort)
         {
             if (operationMode != SocketServiceMode.SERVER)
@@ -145,17 +144,6 @@ namespace Ktos.SocketService
 
             return ip;
         }
-
-        /// <summary>
-        /// An event performed when server started listening
-        /// </summary>
-        public virtual event ListeningEventHandler Listening;
-
-        /// <summary>
-        /// Event handler when server starts listening
-        /// </summary>
-        /// <param name="sender">Sender class reference</param>        
-        public delegate void ListeningEventHandler(object sender);
 
         /// <summary>
         /// When server connection is received, start communication

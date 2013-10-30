@@ -128,11 +128,6 @@ namespace Ktos.SocketService.SldpSocketService
         }
 
         /// <summary>
-        /// Event when client is disconnected
-        /// </summary>
-        //public override event DisconnectedEventHandler Disconnected;
-
-        /// <summary>
         /// Reading the message
         /// </summary>
         /// <param name="reader"></param>

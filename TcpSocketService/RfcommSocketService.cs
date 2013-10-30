@@ -34,6 +34,7 @@ using Windows.Networking.Sockets;
 using Windows.Storage.Streams;
 using Windows.Devices.Bluetooth;
 using Windows.Devices.Bluetooth.Rfcomm;
+using System.Threading.Tasks;
 
 namespace Ktos.SocketService
 {
@@ -122,7 +123,7 @@ namespace Ktos.SocketService
         /// </summary>
         /// <param name="serviceName">Port number to bind to</param>
         /// <param name="serviceGuid">Address to bind to</param>
-        public async void InitializeServer(string serviceName, Guid serviceGuid)
+        public async Task InitializeServer(string serviceName, Guid serviceGuid)
         {
             if (operationMode != SocketServiceMode.SERVER)
                 throw new SocketServiceException("Mode not set properly.");
@@ -145,9 +146,7 @@ namespace Ktos.SocketService
                     InitializeServiceSdpAttributes(rfcommProvider, serviceName);
                     rfcommProvider.StartAdvertising(socketListener);
 
-                    // say you are listening
-                    if (Listening != null)
-                        Listening.Invoke(this, new ListeningEventArgs(null));
+                    return;
                 }
                 else
                 {
@@ -188,18 +187,6 @@ namespace Ktos.SocketService
 
             return listen;
         }
-
-        /// <summary>
-        /// An event performed when server started listening
-        /// </summary>
-        public virtual event ListeningEventHandler Listening;
-
-        /// <summary>
-        /// Event handler when server starts listening
-        /// </summary>
-        /// <param name="sender">Sender class reference</param>
-        /// <param name="e">Event arguments - address bound to</param>
-        public delegate void ListeningEventHandler(object sender, ListeningEventArgs e);
 
         /// <summary>
         /// When server connection is received, start communication

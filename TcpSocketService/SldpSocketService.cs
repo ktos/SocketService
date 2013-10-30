@@ -28,6 +28,7 @@
 #endregion
 
 using System;
+using System.Threading.Tasks;
 using Windows.Storage.Streams;
 
 namespace Ktos.SocketService.SldpSocketService
@@ -145,7 +146,7 @@ namespace Ktos.SocketService.SldpSocketService
         /// </summary>
         /// <param name="message">Message, will be automatically added length</param>
         /// <param name="clientId">GUID of a client to send message to</param>
-        public override async void Send(byte[] message, string clientId)
+        public override async Task SendAsync(byte[] message, string clientId)
         {
             try
             {
@@ -156,6 +157,7 @@ namespace Ktos.SocketService.SldpSocketService
                     c.Writer.WriteBytes(message);
 
                     await c.Writer.StoreAsync();
+                    return;
                 }
                 else
                 {

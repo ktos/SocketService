@@ -207,7 +207,7 @@ namespace Ktos.SocketService
         /// </summary>
         /// <param name="host">Host name to connect to</param>
         /// <param name="port">Port number to connect to</param>
-        public virtual async void InitializeClient(string host, string port)
+        public virtual async Task InitializeClientAsync(string host, string port)
         {
             if (operationMode != SocketServiceMode.CLIENT)
                 throw new SocketServiceException("Mode not set properly.");
@@ -225,6 +225,8 @@ namespace Ktos.SocketService
 
                 // and start communication loop
                 CommunicationLoop(cid);
+
+                return;
             }
             catch (Exception e)
             {
@@ -352,7 +354,7 @@ namespace Ktos.SocketService
         /// </summary>
         /// <param name="message">Message, will be automatically added length</param>
         /// <param name="clientId">Client Id to send data to</param>
-        public virtual async void Send(byte[] message, string clientId)
+        public virtual async Task SendAsync(byte[] message, string clientId)
         {
             try
             {
@@ -362,6 +364,7 @@ namespace Ktos.SocketService
                     c.Writer.WriteBytes(message);
 
                     await c.Writer.StoreAsync();
+                    return;
                 }
                 else
                 {
@@ -382,7 +385,7 @@ namespace Ktos.SocketService
         {
             for (int i = 0; i < clients.Count; i++)
             {
-                this.Send(message, clients[i].Id);
+                this.SendAsync(message, clients[i].Id);
             }
         }
 

@@ -50,7 +50,7 @@ namespace Ktos.SocketService.SldpSocketService
         public SldpSocketService(SocketServiceMode operationMode)
             : base(operationMode)
         {
-            DataReceived = null;
+            
         }
 
         /// <summary>
@@ -97,14 +97,7 @@ namespace Ktos.SocketService.SldpSocketService
 
                 // when disconnected - detach, send event and remove client
                 reader.DetachStream();
-
-                if (Disconnected != null)
-                    Disconnected.Invoke(this, new DisconnectedEventArgs(clientId));
-
-                // removing client
-                clients.Remove(c);
-                c.Dispose();
-                c = null;
+                Disconnect(clientId);
             }
             catch (SocketServiceException)
             {
@@ -137,7 +130,7 @@ namespace Ktos.SocketService.SldpSocketService
         /// <summary>
         /// Event when client is disconnected
         /// </summary>
-        public override event DisconnectedEventHandler Disconnected;
+        //public override event DisconnectedEventHandler Disconnected;
 
         /// <summary>
         /// Reading the message
@@ -181,7 +174,8 @@ namespace Ktos.SocketService.SldpSocketService
         }
 
         /// <summary>
-        /// Executed when new message arrives
+        /// Executed when new message arrives - should be used instead of regular DataReceived,
+        /// as this show properly formatted messages
         /// </summary>
         public event MessageReceivedEventHandler MessageReceived;
 
@@ -191,11 +185,6 @@ namespace Ktos.SocketService.SldpSocketService
         /// <param name="sender">Instance of a server class</param>
         /// <param name="e">A byte array of message</param>
         public delegate void MessageReceivedEventHandler(object sender, MessageReceivedEventArgs e);
-
-        /// <summary>
-        /// Hiding DataReceived event, MessageReceived should be used, as the Message is properly parsed that way
-        /// </summary>
-        private new event DataReceivedEventHandler DataReceived;
     }
 
     /// <summary>

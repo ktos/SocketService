@@ -434,11 +434,11 @@ namespace Ktos.SocketService
         /// </summary>
         public virtual void Disconnect(string clientId)
         {
-            if (socketListener != null)
+            /*if (socketListener != null)
             {
                 socketListener.Dispose();
                 socketListener = null;
-            }
+            }*/
 
             var c = this.GetClient(clientId);
             if (c != null)

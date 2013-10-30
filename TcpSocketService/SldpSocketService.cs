@@ -156,6 +156,7 @@ namespace Ktos.SocketService.SldpSocketService
         /// Sends the message to the other side
         /// </summary>
         /// <param name="message">Message, will be automatically added length</param>
+        /// <param name="clientId">GUID of a client to send message to</param>
         public override async void Send(byte[] message, string clientId)
         {
             try

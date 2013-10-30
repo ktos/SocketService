@@ -29,14 +29,9 @@
 
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Diagnostics;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Windows.Networking.Sockets;
 using Windows.Storage.Streams;
-using Windows.System.Threading;
 
 namespace Ktos.SocketService
 {
@@ -129,12 +124,7 @@ namespace Ktos.SocketService
     /// text chat.
     /// </summary>
     public class TcpSocketService
-    {
-        /// <summary>
-        /// Fake client GUID
-        /// </summary>
-        protected const string CLIENTGUID = "00000000-0000-0000-0000-000000000000";        
-
+    {      
         /// <summary>
         /// Server socket
         /// </summary>
@@ -325,7 +315,7 @@ namespace Ktos.SocketService
 
             // try to connect
             var clientSocket = new StreamSocket();
-            var cid = TcpSocketService.CLIENTGUID;
+            var cid = Guid.Empty.ToString();
             clients.Add(new ServiceClient(cid, clientSocket));
             try
             {
@@ -513,7 +503,7 @@ namespace Ktos.SocketService
             if (operationMode != SocketServiceMode.CLIENT)
                 throw new SocketServiceException("Invalid operation mode");
 
-            this.Disconnect(TcpSocketService.CLIENTGUID);
+            this.Disconnect(Guid.Empty.ToString());
         }
     }
 

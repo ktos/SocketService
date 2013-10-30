@@ -30,6 +30,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Windows.Networking.Sockets;
 using Windows.Storage.Streams;
 
@@ -60,7 +61,7 @@ namespace Ktos.SocketService
     /// Supports creating derived classes for specific protocol implementations.
     /// </summary>
     public class TcpSocketService
-    {      
+    {
         /// <summary>
         /// Server socket
         /// </summary>
@@ -87,59 +88,28 @@ namespace Ktos.SocketService
         }
 
         /// <summary>
-        /// Server initialization - starting listening on a specified port. IP address to bind to will be found automatically 
-        /// without including APIPA addresses, but using IPv6 if possible.
-        /// </summary>
-        /// <param name="servicePort">Port number to bind to</param>
-        public void InitializeServer(string servicePort)
-        {
-            this.InitializeServer(servicePort, false, true);
-        }
-
-
-        /// <summary>
-        /// Server initialization - starting listening on a specified port. IP address to bind to will be found automatically, 
-        /// (excluding APIPA and IPv6, if specified)
-        /// </summary>
-        /// <param name="servicePort">Port number to bind to</param>
-        /// <param name="useApipa">Allows using APIPA addresses (169.254.0.0/16)</param>
-        /// <param name="useIpv6">Allows using IPv6-family addresses</param>
-        public void InitializeServer(string servicePort, bool useApipa, bool useIpv6)
-        {
-            this.InitializeServer(servicePort, findAddress(useApipa, useIpv6));
-        }
-
-        /// <summary>
-        /// Server initialization - starting listening on a specified port and address.
+        /// Server initialization - starting listening on a specified port.
+        /// 
+        /// BindServiceNameAsync we're using is automatically starting listening on every address
+        /// avaliable. To find an suitable address to present client use <see cref="FindAddress"/>
         /// </summary>
         /// <param name="servicePort">Port number to bind to</param>
         /// <param name="serviceAddress">Address to bind to</param>
-        public async void InitializeServer(string servicePort, string serviceAddress)
+        public async Task InitializeServerAsync(string servicePort)
         {
             if (operationMode != SocketServiceMode.SERVER)
                 throw new SocketServiceException("Mode not set properly.");
 
             try
             {
-                string listen = serviceAddress;
+                // start listening
+                socketListener = new StreamSocketListener();
+                socketListener.ConnectionReceived += OnConnectionReceived;
 
-                if (listen != null)
-                {
+                await socketListener.BindServiceNameAsync(servicePort);
 
-                    // start listening
-                    socketListener = new StreamSocketListener();
-                    socketListener.ConnectionReceived += OnConnectionReceived;
+                return;
 
-                    await socketListener.BindServiceNameAsync(servicePort);
-
-                    // say you are listening
-                    if (Listening != null)
-                        Listening.Invoke(this, new ListeningEventArgs(listen));
-                }
-                else
-                {
-                    throw new SocketServiceException("Cannot bind to address");
-                }
             }
             catch (Exception e)
             {
@@ -148,16 +118,16 @@ namespace Ktos.SocketService
         }
 
         /// <summary>
-        /// Automatic finding to what adddress bind to
+        /// Finds an IP address clients may use to connect to
         /// </summary>
         /// <param name="useApipa">Allows using APIPA addresses (169.254.0.0/16)</param>
         /// <param name="useIpv6">Allows using IPv6-family addresses</param>
-        /// <returns>IP address possible to bind to, or null</returns>
-        protected static string findAddress(bool useApipa, bool useIpv6)
+        /// <returns>IP address possible to connect to, or null</returns>
+        public static string FindAddress(bool useApipa, bool useIpv6)
         {
-            string listen = null;
+            string ip = null;
 
-            // finding an IP address to bind to
+            // finding an IP address clients may use to connect to
             foreach (var item in Windows.Networking.Connectivity.NetworkInformation.GetHostNames())
             {
                 if (item.IPInformation != null)
@@ -168,12 +138,12 @@ namespace Ktos.SocketService
                     if (item.DisplayName.StartsWith("169.254") && !useApipa)
                         continue;
 
-                    listen = item.DisplayName;
+                    ip = item.DisplayName;
                     break;
                 }
             }
 
-            return listen;
+            return ip;
         }
 
         /// <summary>
@@ -184,9 +154,8 @@ namespace Ktos.SocketService
         /// <summary>
         /// Event handler when server starts listening
         /// </summary>
-        /// <param name="sender">Sender class reference</param>
-        /// <param name="e">Event arguments - address bound to</param>
-        public delegate void ListeningEventHandler(object sender, ListeningEventArgs e);
+        /// <param name="sender">Sender class reference</param>        
+        public delegate void ListeningEventHandler(object sender);
 
         /// <summary>
         /// When server connection is received, start communication
@@ -401,7 +370,7 @@ namespace Ktos.SocketService
             {
                 var c = GetClient(clientId);
                 if (c != null)
-                {                    
+                {
                     c.Writer.WriteBytes(message);
 
                     await c.Writer.StoreAsync();
@@ -484,28 +453,6 @@ namespace Ktos.SocketService
             : base()
         {
             this.data = data;
-        }
-    }
-
-    /// <summary>
-    /// Event arguments when listening started
-    /// </summary>
-    public class ListeningEventArgs : EventArgs
-    {
-        /// <summary>
-        /// Host we're bind to
-        /// </summary>
-        public string Host { get { return this.host; } }
-        private string host;
-
-        /// <summary>
-        /// Creates a new ListeningEventArgs object
-        /// </summary>
-        /// <param name="host">A host we're bind to</param>
-        public ListeningEventArgs(string host)
-            : base()
-        {
-            this.host = host;
         }
     }
 

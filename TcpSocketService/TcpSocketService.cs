@@ -133,7 +133,7 @@ namespace Ktos.SocketService
         /// <summary>
         /// Fake client GUID
         /// </summary>
-        private const string CLIENTGUID = "00000000-0000-0000-0000-000000000000";
+        protected const string CLIENTGUID = "00000000-0000-0000-0000-000000000000";        
 
         /// <summary>
         /// Server socket
@@ -227,7 +227,7 @@ namespace Ktos.SocketService
         /// <param name="useApipa">Allows using APIPA addresses (169.254.0.0/16)</param>
         /// <param name="useIpv6">Allows using IPv6-family addresses</param>
         /// <returns>IP address possible to bind to, or null</returns>
-        private static string findAddress(bool useApipa, bool useIpv6)
+        protected static string findAddress(bool useApipa, bool useIpv6)
         {
             string listen = null;
 
@@ -253,7 +253,7 @@ namespace Ktos.SocketService
         /// <summary>
         /// An event performed when server started listening
         /// </summary>
-        public event ListeningEventHandler Listening;
+        public virtual event ListeningEventHandler Listening;
 
         /// <summary>
         /// Event handler when server starts listening
@@ -267,7 +267,7 @@ namespace Ktos.SocketService
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="args"></param>
-        protected void OnConnectionReceived(
+        protected virtual void OnConnectionReceived(
             StreamSocketListener sender, StreamSocketListenerConnectionReceivedEventArgs args)
         {
             try
@@ -310,7 +310,7 @@ namespace Ktos.SocketService
         /// <summary>
         /// Notification about client connected, sends information about the client
         /// </summary>
-        public event ClientConnectedEventHandler ClientConnected;
+        public virtual event ClientConnectedEventHandler ClientConnected;
         public delegate void ClientConnectedEventHandler(object sender, ClientConnectedEventArgs e);
 
         /// <summary>
@@ -318,7 +318,7 @@ namespace Ktos.SocketService
         /// </summary>
         /// <param name="host">Host name to connect to</param>
         /// <param name="port">Port number to connect to</param>
-        public async void InitializeClient(string host, string port)
+        public virtual async void InitializeClient(string host, string port)
         {
             if (operationMode != SocketServiceMode.CLIENT)
                 throw new SocketServiceException("Mode not set properly.");
@@ -346,13 +346,13 @@ namespace Ktos.SocketService
         /// <summary>
         /// Notifies about connecting to the sever
         /// </summary>
-        public event ConnectedEventHandler Connected;
+        public virtual event ConnectedEventHandler Connected;
         public delegate void ConnectedEventHandler(object sender);
 
         /// <summary>
         /// Communication loop with the server (or client - it was the same thing)
         /// </summary>
-        protected async void CommunicationLoop(string clientId)
+        protected virtual async void CommunicationLoop(string clientId)
         {
             try
             {
@@ -407,21 +407,38 @@ namespace Ktos.SocketService
             }
             catch (Exception e)
             {
-                if (e.HResult != -2147023901) // exception with -2147023901 is thrown when disconnect is done from our side, so we're ignoring it here
-                    throw new SocketServiceException("Inner exception caused communication break.", e);
+                switch (e.HResult)
+                {
+                    case -2147014842: // exception with -2147014842 is thrown when client is disconnecting
+                        {
+                            Disconnect(clientId);
+                            break;
+                        }
+
+                    case -2147023901: // exception with -2147023901 is thrown when disconnect is done from our side, so we're ignoring it here
+                        {
+                            break;
+                        }
+
+                    default:
+                        {
+                            throw new SocketServiceException("Inner exception caused communication break.", e);
+                        }
+
+                };
             }
         }
 
         /// <summary>
         /// Executed when new message arrives
         /// </summary>
-        public event DataReceivedEventHandler DataReceived;
+        public virtual event DataReceivedEventHandler DataReceived;
         public delegate void DataReceivedEventHandler(object sender, DataReceivedEventArgs e);
 
         /// <summary>
         /// Executed when client (or server) disconnects
         /// </summary>
-        public event DisconnectedEventHandler Disconnected;
+        public virtual event DisconnectedEventHandler Disconnected;
         public delegate void DisconnectedEventHandler(object sender, DisconnectedEventArgs e);
 
         /// <summary>
@@ -429,7 +446,7 @@ namespace Ktos.SocketService
         /// </summary>
         /// <param name="message">Message, will be automatically added length</param>
         /// <param name="clientId">Client Id to send data to</param>
-        public async void Send(byte[] message, string clientId)
+        public virtual async void Send(byte[] message, string clientId)
         {
             try
             {
@@ -467,7 +484,7 @@ namespace Ktos.SocketService
         /// <summary>
         /// Disconnects from server (or client)
         /// </summary>
-        public void Disconnect(string clientId)
+        public virtual void Disconnect(string clientId)
         {
             if (socketListener != null)
             {

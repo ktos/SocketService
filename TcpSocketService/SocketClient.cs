@@ -70,7 +70,7 @@ namespace Ktos.SocketService
         /// <returns>A generated GUID</returns>
         public static string GetRandomId()
         {
-            return Guid.NewGuid().ToString();
+            return "4";
         }
 
         /// <summary>

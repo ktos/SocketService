@@ -86,14 +86,18 @@ namespace Ktos.SocketService.SldpSocketService
                     }
 
                     uint currentLength = reader.ReadUInt32();
-                    readLength = await reader.LoadAsync(currentLength);
-                    if (readLength < currentLength)
-                    {
-                        remoteDisconnection = true;
-                        break;
-                    }
 
-                    readMessage(reader, currentLength);
+                    //if (currentLength > 0)
+                    //{
+                        readLength = await reader.LoadAsync(currentLength);
+                        if (readLength < currentLength)
+                        {
+                            remoteDisconnection = true;
+                            break;
+                        }
+
+                        readMessage(reader, currentLength);
+                    //}
                 }
 
                 // when disconnected - detach, send event and remove client

@@ -385,7 +385,9 @@ namespace Ktos.SocketService
         {
             for (int i = 0; i < clients.Count; i++)
             {
+#pragma warning disable 4014
                 this.SendAsync(message, clients[i].Id);
+#pragma warning restore 4014
             }
         }
 
